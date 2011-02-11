@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    >
+	<ListView
+		android:id="@+id/outputListView"
+	    android:layout_width="fill_parent"
+	    android:layout_height="wrap_content"
+	    />
+	<EditText android:id="@+id/edtInput"
+	        android:layout_width="fill_parent"
+	        android:layout_height="wrap_content"
+	        
+	        android:inputType="textShortMessage|textAutoCorrect|textCapSentences|textMultiLine"
+	        android:imeOptions="actionSend"
+	        android:maxLines="2"
+	        android:maxLength="200"
+	        android:layout_alignParentBottom="true"/>
+</RelativeLayout>
