@@ -3,16 +3,24 @@ package com.test.cc1;
 import java.util.ArrayList;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.Bundle;
+import android.util.Log;
+import android.view.Gravity;
 import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnKeyListener;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -21,12 +29,75 @@ import android.widget.AdapterView.OnItemClickListener;
 public class crowdcontrol extends Activity {
 	public ArrayList<String> ENTRIES = new ArrayList<String>();
 	private LocationManager locationManager;
-	public static String Username = "Eli3";
+	public static String Username = "Nobody";
+	public long Key = 0;
+	
+	public ArrayList<Userkey> uk = new ArrayList<Userkey>(); //arraylist of user->key tuples
+	
 	public Location oldloc = new Location("init");
 	public Location curloc = new Location("cur");
 	public ListView lv1;
 	public EditText ed;
+	
+	@Override
+	public boolean onCreateOptionsMenu(Menu menu) {
+	    MenuInflater inflater = getMenuInflater();
+	    inflater.inflate(R.menu.cc_menu, menu);
+	    return true;
+	}
+ 
+	@Override
+	public boolean onOptionsItemSelected(MenuItem item) {
+	    // Handle item selection
+	    switch (item.getItemId()) {
+	    case R.id.user:
+	        getUser();
+	        return true;
+	    default:
+	        return super.onOptionsItemSelected(item);
+	    }
+	}
+	
+	public void getUser() {
+		final FrameLayout fl = new FrameLayout(this);
+        final EditText input = new EditText(this);
+        input.setGravity(Gravity.CENTER);
 
+        fl.addView(input, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.FILL_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
+
+        input.setText("");
+        new AlertDialog.Builder(this)
+        	.setView(fl)
+        	.setTitle("Enter Username")
+        	.setPositiveButton("OK", new DialogInterface.OnClickListener(){
+        		@Override
+        		public void onClick(DialogInterface d, int which) {
+        			boolean found = false;
+        			d.dismiss();
+        			String curname = input.getText().toString();
+        			Username = curname; //set the new username no matter what
+        			for (Userkey i : uk) {
+        				if (i.getUsername().equals(curname)) {
+        					Key = i.getKey();
+        					found = true;
+        					break;
+        				}
+        			}
+        			if (!found) {
+        				Userkey userkey = new Userkey(curname, new Long(0));
+        				Key = userkey.getKey();
+        				uk.add(userkey); //put the new tuple in the array
+        			}
+        		}
+        	})
+        	.setNegativeButton("Cancel", new DialogInterface.OnClickListener(){
+        		@Override
+        		public void onClick(DialogInterface d, int which) {
+        			d.dismiss();
+        		}
+        	}).create().show();
+	}
+	
     /** Called when the activity is first created. */
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -76,37 +147,6 @@ public class crowdcontrol extends Activity {
         });
     }
     
-    /*
-    public void updateMsg(String msg) {
-    	if (msg.equals("")) {
-    		return;
-    	}
-    	ENTRIES.add(msg); //put the user's message on their own screen first, for a quicker feel
-    	ed.setText("");
-        lv1.setAdapter(new ArrayAdapter<String>(this, R.layout.list_item, ENTRIES)); //display the new list item
-    	String ourLat = Double.toString(curloc.getLatitude());
-		String ourLon = Double.toString(curloc.getLongitude());
-    	RestClient client = new RestClient("http://10.0.2.2:8888/cc1server");
-        client.AddParam("content", msg);
-        client.AddParam("latitude", ourLat);
-        client.AddParam("longitude", ourLon);
-        client.AddParam("username", Username);
-        
-        try
-        {
-            client.Execute(RequestMethod.GET);
-        }
-        catch (Exception e)
-        {
-            ENTRIES.add(e.getMessage());
-        }
-        String response = client.getResponse();
-        if ((response != null) && !response.matches("^\\s*$")) { //this should only run when there were waiting messages on the server
-        	response2list(response); //add any waiting queue entries to the user's list
-        }
-    }
-    
-    */
     //this called by GeoLoc, updates location and sends to server if loc has moved a bunch
     public void updateLoc(Location loc) {
     	if (oldloc.distanceTo(loc) < 10) { //see if we've moved 10 meters
@@ -155,6 +195,7 @@ public class crowdcontrol extends Activity {
     	client.AddParam("latitude", ourLat);
         client.AddParam("longitude", ourLon);
         client.AddParam("username", Username);
+        client.AddParam("key", String.valueOf(Key));
         
         try
         {
@@ -173,10 +214,26 @@ public class crowdcontrol extends Activity {
     }
     
     public void response2list(String response) {
-    	String[] resp = response.split("[|]");
-    	for (String i : resp) {
-    		ENTRIES.add(i);
+    	String[] respf = response.split("[~]");
+    	if (respf.length == 2) {
+    		Key = Long.valueOf(respf[0]);
+    		for (Userkey i : uk) {
+    			if (i.getUsername().equals(Username)) {
+    				i.setKey(Key);
+    				break;
+    			}
+    		}
+    		
+    		response = respf[1];
+    		Log.w("keystuff", " " + respf.length + " " + Key);
     	}
-    	lv1.setAdapter(new ArrayAdapter<String>(this, R.layout.list_item, ENTRIES));
+    	if ((response != null) && !response.matches("^\\s*$")) {
+	    	String[] resp = response.split("[|]");
+			Log.w("keystuff", "response: " + response + " " + resp + " " + resp.length);
+	    	for (String i : resp) {
+	    		ENTRIES.add(i);
+	    	}
+	    	lv1.setAdapter(new ArrayAdapter<String>(this, R.layout.list_item, ENTRIES));
+    	}
     }
 }
