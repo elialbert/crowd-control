@@ -3,4 +3,7 @@
     <item android:id="@+id/user"
           android:icon="@drawable/android_icon_256_copy_normal"
           android:title="Change Username" />
+    <item android:id="@+id/radius"
+    	  android:icon="@drawable/here2"
+    	  android:title="Change Radius" />
 </menu>

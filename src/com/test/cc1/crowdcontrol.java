@@ -16,6 +16,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.Window;
 import android.view.View.OnKeyListener;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -31,9 +32,10 @@ public class crowdcontrol extends Activity {
 	private LocationManager locationManager;
 	public static String Username = "Nobody";
 	public long Key = 0;
-	
+	public static long Radius = 50;
+	public long oldRad = 50;
 	public ArrayList<Userkey> uk = new ArrayList<Userkey>(); //arraylist of user->key tuples
-	
+	public int menuChoice;
 	public Location oldloc = new Location("init");
 	public Location curloc = new Location("cur");
 	public ListView lv1;
@@ -51,51 +53,81 @@ public class crowdcontrol extends Activity {
 	    // Handle item selection
 	    switch (item.getItemId()) {
 	    case R.id.user:
-	        getUser();
+	    	menuChoice = R.id.user;
+	        getUserInput(R.id.user);
 	        return true;
+	    case R.id.radius:
+	    	menuChoice = R.id.radius;
+	    	getUserInput(R.id.radius);
+	    	return true;
 	    default:
 	        return super.onOptionsItemSelected(item);
 	    }
 	}
 	
-	public void getUser() {
+	public void getUserInput(int itemId) { //this is clunky fix/factor it
 		final FrameLayout fl = new FrameLayout(this);
         final EditText input = new EditText(this);
+        String title = "";
         input.setGravity(Gravity.CENTER);
+        if (itemId == R.id.user) 
+        	title = "Enter username";
+        if (itemId == R.id.radius)
+        	title = "Enter radius of hearing";
 
         fl.addView(input, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.FILL_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
 
         input.setText("");
         new AlertDialog.Builder(this)
         	.setView(fl)
-        	.setTitle("Enter Username")
+        	.setTitle(title)
         	.setPositiveButton("OK", new DialogInterface.OnClickListener(){
         		@Override
         		public void onClick(DialogInterface d, int which) {
-        			boolean found = false;
         			d.dismiss();
-        			String curname = input.getText().toString();
-        			Username = curname; //set the new username no matter what
-        			for (Userkey i : uk) {
-        				if (i.getUsername().equals(curname)) {
-        					Key = i.getKey();
-        					found = true;
-        					break;
-        				}
-        			}
-        			if (!found) {
-        				Userkey userkey = new Userkey(curname, new Long(0));
-        				Key = userkey.getKey();
-        				uk.add(userkey); //put the new tuple in the array
-        			}
+        			doMenu(input.getText().toString());       			
         		}
         	})
         	.setNegativeButton("Cancel", new DialogInterface.OnClickListener(){
         		@Override
         		public void onClick(DialogInterface d, int which) {
         			d.dismiss();
+        			menuChoice = 0;
         		}
         	}).create().show();
+	}
+	
+	public void doMenu(String input) {
+		if (menuChoice == R.id.user) {
+			boolean found = false;
+	        if (input.equals("")) {
+	        	return;
+	        }
+	        Username = input; //set the new username no matter what
+	        for (Userkey i : uk) {
+				if (i.getUsername().equals(input)) {
+					Key = i.getKey(); //client has saved key
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				Userkey userkey = new Userkey(input, new Long(0)); //init from clientside with key=0
+				Key = userkey.getKey();
+				uk.add(userkey); //put the new tuple in the array
+			}
+			setTitle(Username + ", Radius set to " + Radius);
+			return;
+		}
+		
+		if (menuChoice == R.id.radius) {
+	    	if (input.matches("[/d+]")) {
+	    		Radius = Long.valueOf(input);
+	    		setTitle(Username + ", Radius set to " + Radius);
+	    		return;
+	    	}
+	    	return;
+		}
 	}
 	
     /** Called when the activity is first created. */
@@ -104,6 +136,10 @@ public class crowdcontrol extends Activity {
         super.onCreate(savedInstanceState);
         
         setContentView(R.layout.main);
+        //requestWindowFeature(Window.FEATURE_CUSTOM_TITLE);
+        //getWindow().setFeatureInt(Window.FEATURE_CUSTOM_TITLE,);
+        //TextView title(TextView) = findViewById(android.R.id.title);
+        
         lv1 = /*getListView(); */(ListView)findViewById(R.id.outputListView);
         ed = (EditText)findViewById(R.id.edtInput);
         //set up recurring geolocation updates
@@ -114,7 +150,6 @@ public class crowdcontrol extends Activity {
 		oldloc.setLongitude(-122.0);
 		curloc.setLatitude(71.0);
 		curloc.setLongitude(-122.0);
-        ENTRIES.add("test1");
 
         lv1.setAdapter(new ArrayAdapter<String>(this, R.layout.list_item, ENTRIES));
 
@@ -165,7 +200,7 @@ public class crowdcontrol extends Activity {
     	
     	//MESSAGE SENDING
     	if ((msg != null) && !msg.matches("^\\s*$")) { //we have a real message to send
-    		ENTRIES.add(msg); //put the user's message on their own screen first, for a quicker feel
+    		ENTRIES.add(Username + ": " + msg); //put the user's message on their own screen first, for a quicker feel
         	ed.setText("");
             lv1.setAdapter(new ArrayAdapter<String>(this, R.layout.list_item, ENTRIES)); //display the new list item
             client.AddParam("content", msg);
@@ -191,11 +226,16 @@ public class crowdcontrol extends Activity {
             curloc = loc;
     	}
     	
-    	
     	client.AddParam("latitude", ourLat);
         client.AddParam("longitude", ourLon);
         client.AddParam("username", Username);
         client.AddParam("key", String.valueOf(Key));
+        
+        //send the radius if it has changed
+        if (oldRad != Radius) {
+        	client.AddParam("radius", String.valueOf(Radius));
+        	oldRad = Radius;
+        }
         
         try
         {
@@ -229,8 +269,10 @@ public class crowdcontrol extends Activity {
     	}
     	if ((response != null) && !response.matches("^\\s*$")) {
 	    	String[] resp = response.split("[|]");
-			Log.w("keystuff", "response: " + response + " " + resp + " " + resp.length);
-	    	for (String i : resp) {
+	    	
+	    	Log.w("keystuff", "response: " + response + " " + resp + " " + resp.length);
+	    	for (int j = 0; j < resp.length - 1; j ++) {
+	    		String i = resp[j];
 	    		ENTRIES.add(i);
 	    	}
 	    	lv1.setAdapter(new ArrayAdapter<String>(this, R.layout.list_item, ENTRIES));
