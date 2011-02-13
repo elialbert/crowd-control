@@ -1,4 +1,4 @@
-package com.test.cc1;
+package com.elialbert.cc1;
 
 import android.location.Location;
 import android.location.LocationListener;
@@ -14,19 +14,21 @@ public class GeoLoc implements LocationListener {
 
 	@Override
 	public void onLocationChanged(Location location) {
-		this.parent.updateLoc(location); //referring to crowdcontrol, update the location
+		this.parent.errtitleString = "";
+		if (this.parent.paused == 0)
+			this.parent.updateLoc(location); //referring to crowdcontrol, update the location
 	}
 	
 	@Override
 	public void onProviderDisabled(String provider) {
-		// TODO Auto-generated method stub
-		
+		this.parent.errtitleString = "Please Enable GPS";
+		this.parent.setTitle(this.parent.titleString + ", " + this.parent.errtitleString);
 	}
 	
 	@Override
 	public void onProviderEnabled(String provider) {
-		// TODO Auto-generated method stub
-		
+		this.parent.errtitleString = "";
+		this.parent.setTitle(this.parent.titleString + ", " + this.parent.errtitleString);		
 	}
 	
 	@Override

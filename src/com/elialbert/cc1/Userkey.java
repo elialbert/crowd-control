@@ -1,4 +1,4 @@
-package com.test.cc1;
+package com.elialbert.cc1;
 
 public class Userkey {
 	private String username;

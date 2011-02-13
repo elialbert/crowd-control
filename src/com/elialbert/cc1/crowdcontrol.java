@@ -1,4 +1,4 @@
-package com.test.cc1;
+package com.elialbert.cc1;
 
 import java.util.ArrayList;
 
@@ -28,12 +28,15 @@ import android.widget.Toast;
 import android.widget.AdapterView.OnItemClickListener;
 
 public class crowdcontrol extends Activity {
+	public static long DEFAULT_RAD = 50;
 	public ArrayList<String> ENTRIES = new ArrayList<String>();
 	private LocationManager locationManager;
 	public static String Username = "Nobody";
 	public long Key = 0;
-	public static long Radius = 50;
-	public long oldRad = 50;
+	public long Radius = DEFAULT_RAD;
+	public long oldRad = DEFAULT_RAD;
+	public String errtitleString = "";
+	public String titleString = "";
 	public ArrayList<Userkey> uk = new ArrayList<Userkey>(); //arraylist of user->key tuples
 	public int menuChoice;
 	public Location oldloc = new Location("init");
@@ -42,6 +45,8 @@ public class crowdcontrol extends Activity {
 	public ListView lv1;
 	public EditText ed;
 	public String tosend;
+	public String oldtitle;
+	public int paused = 0;
 	
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -62,6 +67,10 @@ public class crowdcontrol extends Activity {
 	    	menuChoice = R.id.radius;
 	    	getUserInput(R.id.radius);
 	    	return true;
+	    case R.id.pause:
+	    	paused = 1;
+	    case R.id.resume:
+	    	paused = 0;
 	    default:
 	        return super.onOptionsItemSelected(item);
 	    }
@@ -75,7 +84,7 @@ public class crowdcontrol extends Activity {
         if (itemId == R.id.user) 
         	title = "Enter username";
         if (itemId == R.id.radius)
-        	title = "Enter radius of hearing";
+        	title = "Enter distance of output in m";
 
         fl.addView(input, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.FILL_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
 
@@ -118,7 +127,8 @@ public class crowdcontrol extends Activity {
 				Key = userkey.getKey();
 				uk.add(userkey); //put the new tuple in the array
 			}
-			setTitle(Username + ", Radius set to " + Radius);
+			titleString = (Username + ", distance set to " + Radius + "m");
+			setTitle(titleString + " " + errtitleString);
 			return;
 		}
 		
@@ -126,12 +136,13 @@ public class crowdcontrol extends Activity {
 	    	//if (input.matches("[/d+]")) {
 	    	try {
 	    		Radius = Long.valueOf(input);
-	    		setTitle(Username + ", radius set to " + Radius);
+	    		setTitle(Username + ", distance set to " + Radius + "m");
 	    		return;
 	    	}
 	    	catch (Exception e) {
 	    		Radius = 50;
-	    		setTitle(Username + ", radius error, radius set to 50");
+	    		titleString = (Username + ", distance error, distance set to 50m");
+	    		setTitle(titleString + " " + errtitleString);
 	    	}
 	    	//}
 	    	return;
@@ -150,6 +161,7 @@ public class crowdcontrol extends Activity {
         
         lv1 = /*getListView(); */(ListView)findViewById(R.id.outputListView);
         ed = (EditText)findViewById(R.id.edtInput);
+        errtitleString = "please enable GPS.";
         //set up recurring geolocation updates
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0,
@@ -160,6 +172,11 @@ public class crowdcontrol extends Activity {
 		curloc.setLatitude(71.0);
 		curloc.setLongitude(-122.0);
 		tosend = "";
+		
+		//init the first username ("Nobody")
+		Userkey userkey = new Userkey(Username, new Long(0)); //init from clientside with key=0
+		Key = userkey.getKey();
+		uk.add(userkey); //put the new tuple in the array
 
         lv1.setAdapter(new ArrayAdapter<String>(this, R.layout.list_item, ENTRIES));
 
@@ -216,8 +233,8 @@ public class crowdcontrol extends Activity {
         
         //send any result to be printed
         protected void onPostExecute(String result) {
-        	Log.w("SERVERTASK", result);
-        	Log.w("post", "in thread?");
+        	if (result != null) 
+        		Log.w("SERVERTASK", result);
             crowdcontrol.this.response2list(result);
         }
     }
@@ -276,7 +293,7 @@ public class crowdcontrol extends Activity {
         client.AddParam("key", String.valueOf(Key));
         
         //send the radius if it has changed
-        if (oldRad != Radius) {
+        if ((oldRad != Radius) || (oldRad == DEFAULT_RAD)) {
         	client.AddParam("radius", String.valueOf(Radius));
         	oldRad = Radius;
         }
@@ -310,20 +327,17 @@ public class crowdcontrol extends Activity {
 	    		}
 	    		
 	    		response = respf[1];
-	    		Log.w("keystuff", " " + respf.length + " " + Key);
 	    	}
 	    	if ((response != null) && !response.matches("^\\s*$")) {
 		    	String[] resp = response.split("[|]");
 		    	
-		    	Log.w("keystuff", "response: " + response + " " + resp + " " + resp.length);
+		    	Log.i("keystuff", "response: " + response + " " + resp + " " + resp.length);
 		    	for (int j = 0; j < resp.length - 1; j ++) {
 		    		String i = resp[j];
 		    		ENTRIES.add(i);
 		    	}
 		    	lv1.setAdapter(new ArrayAdapter<String>(this, R.layout.list_item, ENTRIES));
-		    	Log.w("THREADSARG", "not past here");
 	    	}
-	    	Log.w("THREADSARG", "or here either");
     	}
     }
 }

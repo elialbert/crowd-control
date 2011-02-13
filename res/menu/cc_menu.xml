@@ -6,4 +6,11 @@
     <item android:id="@+id/radius"
     	  android:icon="@drawable/here2"
     	  android:title="Change Radius" />
+    <item android:id="@+id/pause"
+          android:icon="@drawable/red"
+          android:title="Pause" />
+    <item android:id="@+id/resume"
+    	  android:icon="@drawable/blue"
+          android:title="Resume" />
+
 </menu>
