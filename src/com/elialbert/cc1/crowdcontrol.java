@@ -1,6 +1,10 @@
 package com.elialbert.cc1;
 
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Timer;
+import java.util.TimerTask;
 
 import android.app.Activity;
 import android.app.AlertDialog;
@@ -10,6 +14,8 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.KeyEvent;
@@ -34,6 +40,7 @@ public class crowdcontrol extends Activity {
 	public long Key = 0;
 	public long Radius = DEFAULT_RAD;
 	public long oldRad = DEFAULT_RAD;
+	public static long LOC_DELAY = 10000;
 	public String errtitleString = "";
 	public String titleString = "Crowd Control";
 	public int menuChoice;
@@ -44,9 +51,13 @@ public class crowdcontrol extends Activity {
 	public EditText ed;
 	public String tosend;
 	public String oldtitle;
+    public Calendar curCal = Calendar.getInstance();
+    public Calendar newCal = Calendar.getInstance();
 	public int paused = 0;
 	public LocationManager locationManager;
     GeoLoc curGeoLoc = new GeoLoc(this);
+    private Timer timer1;
+    Handler mHandler = new Handler(Looper.getMainLooper());
 	
     public int getPaused () {
     	return this.paused;
@@ -72,15 +83,25 @@ public class crowdcontrol extends Activity {
 	    	getUserInput(R.id.radius);
 	    	return true;
 	    case R.id.pause:
-	    	paused = 1;
-	    	setTitle("Paused");
-	    	locationManager.removeUpdates(curGeoLoc);
+	    	if (paused == 0) {
+		    	paused = 1;
+		    	setTitle("Paused");
+		    	locationManager.removeUpdates(curGeoLoc);
+		    	timer1.cancel();
+	    	}
 	    	return true;
 	    case R.id.resume:
-	    	paused = 0;
-	    	setTitle(titleString + " " + errtitleString);
-			locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0,
-					0, curGeoLoc);
+	    	if (paused == 1) {
+		    	setTitle(titleString + " " + errtitleString);
+				locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, LOC_DELAY,
+						0, curGeoLoc);
+				paused = 0;
+		        timer1 = new Timer();
+		        Date curDate = new Date();
+	    	    curCal.setTime(curDate);
+				timerStart(timer1, mHandler);
+	    	}
+	    	
 			return true;
 	    default:
 	        return super.onOptionsItemSelected(item);
@@ -162,7 +183,8 @@ public class crowdcontrol extends Activity {
         errtitleString = "please enable GPS";
         //set up recurring geolocation updates
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0,
+        //note: the docs say that the mintime LOC_DELAY here is only a hint to conserve power, and it could update faster or slower...
+		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, LOC_DELAY,
 				0, curGeoLoc);
 		sendloc = null;
 		oldloc.setLatitude(71.0);
@@ -170,6 +192,9 @@ public class crowdcontrol extends Activity {
 		curloc.setLatitude(71.0);
 		curloc.setLongitude(-122.0);
 		tosend = "";
+		
+		Date curDate = new Date();
+	    curCal.setTime(curDate);
 
         lv1.setAdapter(new ArrayAdapter<String>(this, R.layout.list_item, ENTRIES));
 
@@ -202,6 +227,48 @@ public class crowdcontrol extends Activity {
             }
 
         });
+        
+
+        //let's keep these updates flowing
+        timer1 = new Timer();
+        timerStart(timer1, mHandler);
+
+    }
+    
+    public void timerStart(Timer t, final Handler m) {
+    	t.schedule(new TimerTask() {
+			@Override
+			public void run() { //the following is thread-magic from stack overflow. meh.
+				m.post(new Runnable() {
+			          public void run() {
+
+			        	  loopMethod();
+			          }
+				});
+			}
+
+		}, 0, 1500);
+    }
+    
+    public void loopMethod() {
+    	Log.i("TIMER! ","in timer loop, ok?");
+    	
+    	
+    	//if there's been no input in or out in 3 minutes, pause everything. the user will have to manually unpause.
+    	Date newDate = new Date();
+		newCal.setTime(newDate);
+	    newCal.add(Calendar.MINUTE, -3);
+	    Log.i("CALENDAR TIMER: ","current time: " + newDate.toLocaleString() + " last updated at " + curCal.getTime().toLocaleString());
+		if (newCal.after(curCal)) {
+			paused = 1;
+	    	setTitle("Paused");
+	    	locationManager.removeUpdates(curGeoLoc);
+	    	timer1.cancel();
+	    	return;
+		}
+		
+		
+    	new serverTask().execute("");
     }
     
     
@@ -211,6 +278,8 @@ public class crowdcontrol extends Activity {
     	@Override
     	public void onPreExecute() {
     		if ((tosend != null) && !tosend.matches("^\\s*$")) {
+    			Date curDate = new Date();
+	    	    curCal.setTime(curDate);
     			ENTRIES.add(Username + ": " + tosend); //put the user's message on their own screen first, for a quicker feel
     			tosend = "";
     			ed.setText("");
@@ -243,11 +312,14 @@ public class crowdcontrol extends Activity {
     		curloc = loc;
     		sendloc = curloc;
     	}
-    	new serverTask().execute(""); //hit the server using the gps loop as our driver loop
+    	//new serverTask().execute(""); //don't send to the server, just update the location. let the timer loop decide when to hit the server.
     }
     
     
     public String update(String msg, Location loc) {
+    	if (paused == 1) {
+    		return null;
+    	}
     	//RestClient client = new RestClient("http://10.0.2.2:8888/cc1server"); //get that server
     	RestClient client = new RestClient("http://crowd-control.appspot.com/cc1server"); //get that server
     	String ourLat = "";
@@ -302,6 +374,9 @@ public class crowdcontrol extends Activity {
     
     public void response2list(String response) {
     	if ((response != null) && !response.matches("^\\s*$")) {
+    		Date curDate = new Date();
+    	    curCal.setTime(curDate);
+    	    
 	    	String[] respf = response.split("[~]");
 	    	if (respf.length == 2) {
 	    		Key = Long.valueOf(respf[0]);
@@ -309,6 +384,7 @@ public class crowdcontrol extends Activity {
 	    		response = respf[1];
 	    	}
 	    	if ((response != null) && !response.matches("^\\s*$")) {
+	    		
 		    	String[] resp = response.split("[|]");
 		    	
 		    	Log.i("keystuff", "response: " + response + " " + resp + " " + resp.length);
