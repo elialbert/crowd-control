@@ -30,14 +30,12 @@ import android.widget.AdapterView.OnItemClickListener;
 public class crowdcontrol extends Activity {
 	public static long DEFAULT_RAD = 50;
 	public ArrayList<String> ENTRIES = new ArrayList<String>();
-	private LocationManager locationManager;
 	public static String Username = "Nobody";
 	public long Key = 0;
 	public long Radius = DEFAULT_RAD;
 	public long oldRad = DEFAULT_RAD;
 	public String errtitleString = "";
-	public String titleString = "";
-	public ArrayList<Userkey> uk = new ArrayList<Userkey>(); //arraylist of user->key tuples
+	public String titleString = "Crowd Control";
 	public int menuChoice;
 	public Location oldloc = new Location("init");
 	public Location curloc = new Location("cur");
@@ -47,7 +45,13 @@ public class crowdcontrol extends Activity {
 	public String tosend;
 	public String oldtitle;
 	public int paused = 0;
+	public LocationManager locationManager;
+    GeoLoc curGeoLoc = new GeoLoc(this);
 	
+    public int getPaused () {
+    	return this.paused;
+    }
+    
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 	    MenuInflater inflater = getMenuInflater();
@@ -69,14 +73,21 @@ public class crowdcontrol extends Activity {
 	    	return true;
 	    case R.id.pause:
 	    	paused = 1;
+	    	setTitle("Paused");
+	    	locationManager.removeUpdates(curGeoLoc);
+	    	return true;
 	    case R.id.resume:
 	    	paused = 0;
+	    	setTitle(titleString + " " + errtitleString);
+			locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0,
+					0, curGeoLoc);
+			return true;
 	    default:
 	        return super.onOptionsItemSelected(item);
 	    }
 	}
 	
-	public void getUserInput(int itemId) { //this is clunky fix/factor it
+	public void getUserInput(int itemId) { 
 		final FrameLayout fl = new FrameLayout(this);
         final EditText input = new EditText(this);
         String title = "";
@@ -110,23 +121,12 @@ public class crowdcontrol extends Activity {
 	
 	public void doMenu(String input) {
 		if (menuChoice == R.id.user) {
-			boolean found = false;
+			//boolean found = false;
 	        if (input.equals("")) {
 	        	return;
 	        }
 	        Username = input; //set the new username no matter what
-	        for (Userkey i : uk) {
-				if (i.getUsername().equals(input)) {
-					Key = i.getKey(); //client has saved key
-					found = true;
-					break;
-				}
-			}
-			if (!found) {
-				Userkey userkey = new Userkey(input, new Long(0)); //init from clientside with key=0
-				Key = userkey.getKey();
-				uk.add(userkey); //put the new tuple in the array
-			}
+	        Key = 0;
 			titleString = (Username + ", distance set to " + Radius + "m");
 			setTitle(titleString + " " + errtitleString);
 			return;
@@ -136,7 +136,8 @@ public class crowdcontrol extends Activity {
 	    	//if (input.matches("[/d+]")) {
 	    	try {
 	    		Radius = Long.valueOf(input);
-	    		setTitle(Username + ", distance set to " + Radius + "m");
+	    		titleString = Username + ", distance set to " + Radius + "m";
+	    		setTitle(titleString + " " + errtitleString);
 	    		return;
 	    	}
 	    	catch (Exception e) {
@@ -155,28 +156,20 @@ public class crowdcontrol extends Activity {
         super.onCreate(savedInstanceState);
         
         setContentView(R.layout.main);
-        //requestWindowFeature(Window.FEATURE_CUSTOM_TITLE);
-        //getWindow().setFeatureInt(Window.FEATURE_CUSTOM_TITLE,);
-        //TextView title(TextView) = findViewById(android.R.id.title);
         
         lv1 = /*getListView(); */(ListView)findViewById(R.id.outputListView);
         ed = (EditText)findViewById(R.id.edtInput);
-        errtitleString = "please enable GPS.";
+        errtitleString = "please enable GPS";
         //set up recurring geolocation updates
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0,
-				0, new GeoLoc(this));
+				0, curGeoLoc);
 		sendloc = null;
 		oldloc.setLatitude(71.0);
 		oldloc.setLongitude(-122.0);
 		curloc.setLatitude(71.0);
 		curloc.setLongitude(-122.0);
 		tosend = "";
-		
-		//init the first username ("Nobody")
-		Userkey userkey = new Userkey(Username, new Long(0)); //init from clientside with key=0
-		Key = userkey.getKey();
-		uk.add(userkey); //put the new tuple in the array
 
         lv1.setAdapter(new ArrayAdapter<String>(this, R.layout.list_item, ENTRIES));
 
@@ -200,7 +193,6 @@ public class crowdcontrol extends Activity {
                 if ((event.getAction() == KeyEvent.ACTION_DOWN) &&
                     (keyCode == KeyEvent.KEYCODE_ENTER)) {
                   // Perform action on key press
-                  //update(String.valueOf(ed.getText()), null);
                 	sendloc = curloc; //make sure we send the current location over as well
                 	tosend = String.valueOf(ed.getText());
             		new serverTask().execute(tosend);
@@ -277,9 +269,6 @@ public class crowdcontrol extends Activity {
     		ourLon = Double.toString(curloc.getLongitude());
     	}
     	else { //only get here if we're updating location specifically
-    		//if (oldloc.distanceTo(loc) < 10) { //see if we've moved 10 meters
-        	//	curloc = loc;
-    		//}
         	ourLat = Double.toString(loc.getLatitude());
     		ourLon = Double.toString(loc.getLongitude());
             
@@ -309,9 +298,6 @@ public class crowdcontrol extends Activity {
  
         String response = client.getResponse();
         return response;
-        /*if ((response != null) && !response.matches("^\\s*$")) { //this should only run when there were waiting messages on the server
-        	response2list(response); //add any queue entries to the user's list
-        */
     }
     
     public void response2list(String response) {
@@ -319,13 +305,7 @@ public class crowdcontrol extends Activity {
 	    	String[] respf = response.split("[~]");
 	    	if (respf.length == 2) {
 	    		Key = Long.valueOf(respf[0]);
-	    		for (Userkey i : uk) {
-	    			if (i.getUsername().equals(Username)) {
-	    				i.setKey(Key);
-	    				break;
-	    			}
-	    		}
-	    		
+	    		Log.i("KEYSTUFF", "key is " + Key);
 	    		response = respf[1];
 	    	}
 	    	if ((response != null) && !response.matches("^\\s*$")) {

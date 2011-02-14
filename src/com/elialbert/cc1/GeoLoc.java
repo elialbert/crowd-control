@@ -2,7 +2,9 @@ package com.elialbert.cc1;
 
 import android.location.Location;
 import android.location.LocationListener;
+import android.location.LocationManager;
 import android.os.Bundle;
+import android.util.Log;
 
 public class GeoLoc implements LocationListener {
 	
@@ -12,9 +14,11 @@ public class GeoLoc implements LocationListener {
 		this.parent = cc; //get a dynamic ref to the crowdcontrol class
 		}
 
+	
 	@Override
 	public void onLocationChanged(Location location) {
 		this.parent.errtitleString = "";
+		Log.i("gps","active in thread, not paused" + this.parent.paused);
 		if (this.parent.paused == 0)
 			this.parent.updateLoc(location); //referring to crowdcontrol, update the location
 	}

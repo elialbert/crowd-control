@@ -5,7 +5,7 @@
           android:title="Change Username" />
     <item android:id="@+id/radius"
     	  android:icon="@drawable/here2"
-    	  android:title="Change Radius" />
+    	  android:title="Change Distance" />
     <item android:id="@+id/pause"
           android:icon="@drawable/red"
           android:title="Pause" />
