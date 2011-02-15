@@ -34,7 +34,7 @@ import android.widget.Toast;
 import android.widget.AdapterView.OnItemClickListener;
 
 public class crowdcontrol extends Activity {
-	public static long DEFAULT_RAD = 50;
+	public static long DEFAULT_RAD = 0;
 	public ArrayList<String> ENTRIES = new ArrayList<String>();
 	public static String Username = "Nobody";
 	public long Key = 0;
@@ -42,7 +42,7 @@ public class crowdcontrol extends Activity {
 	public long oldRad = DEFAULT_RAD;
 	public static long LOC_DELAY = 10000;
 	public String errtitleString = "";
-	public String titleString = "Crowd Control";
+	public String titleString = "Crowd Control, range=0=inf";
 	public int menuChoice;
 	public Location oldloc = new Location("init");
 	public Location curloc = new Location("cur");
@@ -116,7 +116,7 @@ public class crowdcontrol extends Activity {
         if (itemId == R.id.user) 
         	title = "Enter username";
         if (itemId == R.id.radius)
-        	title = "Enter distance of output in m";
+        	title = "Enter range of hearing in m(0=inf)";
 
         fl.addView(input, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.FILL_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
 
@@ -146,9 +146,11 @@ public class crowdcontrol extends Activity {
 	        if (input.equals("")) {
 	        	return;
 	        }
+	        input = input.replaceAll("\\n", ""); //we don't really want big whitespace in the username
+	        input = input.replaceAll("\\t", "");
 	        Username = input; //set the new username no matter what
 	        Key = 0;
-			titleString = (Username + ", distance set to " + Radius + "m");
+			titleString = (Username + ", range set to " + Radius + "m(0=inf)");
 			setTitle(titleString + " " + errtitleString);
 			return;
 		}
@@ -157,13 +159,13 @@ public class crowdcontrol extends Activity {
 	    	//if (input.matches("[/d+]")) {
 	    	try {
 	    		Radius = Long.valueOf(input);
-	    		titleString = Username + ", distance set to " + Radius + "m";
+	    		titleString = Username + ", range set to " + Radius + "m(0=inf)";
 	    		setTitle(titleString + " " + errtitleString);
 	    		return;
 	    	}
 	    	catch (Exception e) {
-	    		Radius = 50;
-	    		titleString = (Username + ", distance error, distance set to 50m");
+	    		Radius = 0;
+	    		titleString = (Username + ", distance error, range set to inf");
 	    		setTitle(titleString + " " + errtitleString);
 	    	}
 	    	//}
@@ -377,8 +379,12 @@ public class crowdcontrol extends Activity {
     		Date curDate = new Date();
     	    curCal.setTime(curDate);
     	    
-	    	String[] respf = response.split("[~]");
-	    	if (respf.length == 2) {
+	    	String[] respf = response.split("[<<<]");
+	    	Log.i("k2", "respf: " + respf[0] + ":" + respf.length);
+	    	for (String ab : respf) {
+	    		Log.i("nk", ab);
+	    	}
+	    	if (respf.length > 1) {
 	    		Key = Long.valueOf(respf[0]);
 	    		Log.i("KEYSTUFF", "key is " + Key);
 	    		response = respf[1];
